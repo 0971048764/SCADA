@@ -96,10 +96,17 @@
         /* Animations */
         .pump-on { color: var(--primary); animation: pulse 1.5s infinite; }
         .pump-off { color: var(--danger); }
+        .power-on { color: #f39c12; animation: pulse-orange 1.5s infinite; }
+        .power-off { color: #95a5a6; }
         @keyframes pulse {
             0% { text-shadow: 0 0 0 rgba(46, 204, 113, 0.4); transform: scale(1); }
             70% { text-shadow: 0 0 20px rgba(46, 204, 113, 0); transform: scale(1.1); }
             100% { text-shadow: 0 0 0 rgba(46, 204, 113, 0); transform: scale(1); }
+        }
+        @keyframes pulse-orange {
+            0% { text-shadow: 0 0 0 rgba(243, 156, 18, 0.4); transform: scale(1); }
+            70% { text-shadow: 0 0 20px rgba(243, 156, 18, 0); transform: scale(1.1); }
+            100% { text-shadow: 0 0 0 rgba(243, 156, 18, 0); transform: scale(1); }
         }
 
         /* --- CONTROLS AREA --- */
@@ -161,8 +168,53 @@
         .btn-big:active { transform: scale(0.95); }
         .btn-start { background: linear-gradient(145deg, #2ecc71, #27ae60); box-shadow: 0 4px #219150; }
         .btn-stop { background: linear-gradient(145deg, #e74c3c, #c0392b); box-shadow: 0 4px #96281b; }
+        .btn-power { background: linear-gradient(145deg, #f39c12, #d35400); box-shadow: 0 4px #e67e22; }
         .btn-reset { background: var(--dark); grid-column: span 2; margin-top: 10px; }
         .disabled { opacity: 0.5; pointer-events: none; filter: grayscale(100%); }
+
+        /* MANUAL VALVE GRID */
+        .manual-valve-grid {
+            display: grid;
+            /* Giảm số cột xuống để ô to hơn */
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        /* Valve Wrapper Card */
+        .valve-wrapper {
+            background: #fff; border: 1px solid #e0e0e0; border-radius: 10px;
+            padding: 20px; display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .valve-label { font-weight: bold; font-size: 1.2rem; color: var(--dark); }
+        .valve-status-group { display: flex; align-items: center; gap: 10px; }
+
+        /* LED Indicator */
+        .led {
+            width: 12px; height: 12px; border-radius: 50%;
+            background-color: #bdc3c7; /* OFF */
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+        .led.on {
+            background-color: var(--primary); /* ON */
+            box-shadow: 0 0 8px var(--primary), inset 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        /* Small Toggle Switch */
+        .switch-sm { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch-sm input { opacity: 0; width: 0; height: 0; }
+        .slider-sm {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc; transition: .4s; border-radius: 34px;
+        }
+        .slider-sm:before {
+            position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider-sm { background-color: var(--primary); }
+        input:checked + .slider-sm:before { transform: translateX(26px); }
 
         /* NOTIFICATION & LOG */
         .notification-area { position: relative; cursor: pointer; margin-right: 15px; color: var(--dark); }
@@ -253,6 +305,42 @@
         }
         .btn-full { width: 100%; margin-top: 15px; padding: 12px; font-size: 1rem; background-color: #3498db; }
         
+        /* --- Responsive Design --- */
+        @media (max-width: 980px) { /* Breakpoint khi layout có thể chuyển thành 2 cột */
+            /* Reset style inline buộc card cấu hình van chiếm toàn bộ chiều rộng.
+               Trên màn hình nhỏ hơn, nó sẽ hoạt động như một card bình thường, tránh các khoảng trống không mong muốn. */
+            .card[style*="grid-column"] {
+                grid-column: auto !important;
+            }
+        }
+
+        @media (max-width: 768px) { /* Dành cho máy tính bảng và nhỏ hơn */
+            header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            h2 {
+                font-size: 1.3rem;
+            }
+
+            .valve-grid {
+                /* 3 cột trên máy tính bảng */
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) { /* Dành cho điện thoại */
+            body {
+                padding: 10px;
+            }
+
+            .valve-grid {
+                /* 2 cột trên điện thoại */
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
     </style>
 </head>
 <body>
@@ -301,6 +389,11 @@
                 </div>
                 <div class="status-display">
                     <div class="status-item">
+                        <i id="iconPower" class="fas fa-bolt big-icon"></i>
+                        <span class="status-text" id="lblPower">OFF</span>
+                        <span class="status-sub">Nguồn</span>
+                    </div>
+                    <div class="status-item">
                         <i id="iconPump" class="fas fa-water big-icon"></i>
                         <span class="status-text" id="lblPump">OFF</span>
                         <span class="status-sub">Máy Bơm</span>
@@ -332,13 +425,16 @@
 
                 <!-- Manual Buttons -->
                 <div id="manualPanel" class="manual-controls">
+                    <button id="btnPower" class="btn-big btn-power" onclick="togglePower()">
+                        <i class="fas fa-bolt fa-2x"></i><br><span id="txtPower">BẬT NGUỒN</span>
+                    </button>
                     <button class="btn-big btn-start" onclick="sendMqtt('farm/manual', 'on')">
                         <i class="fas fa-power-off fa-2x"></i><br>BẬT BƠM
                     </button>
-                    <button class="btn-big btn-stop" onclick="sendMqtt('farm/manual', 'off')">
+                    <button class="btn-big btn-stop" onclick="sendMqtt('farm/manual', 'off')"> <!-- Bỏ grid-column: span 2 cũ nếu có -->
                         <i class="fas fa-stop-circle fa-2x"></i><br>TẮT HẾT
                     </button>
-                    <button id="mainResetBtn" class="btn-big btn-reset disabled" onclick="sendMqtt('farm/reset', '1')">
+                    <button id="mainResetBtn" class="btn-big btn-reset disabled" style="grid-column: span 1;" onclick="sendMqtt('farm/reset', '1')">
                         <i class="fas fa-redo"></i> RESET HỆ THỐNG
                     </button>
                 </div>
@@ -378,6 +474,13 @@
                     <!-- JS Render -->
                 </div>
                 <button class="btn-save btn-full" onclick="saveValveTimes()">LƯU CẤU HÌNH VAN</button>
+                
+                <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+                
+                <div class="card-header"><i class="fas fa-hand-pointer"></i><h3>Điều Khiển Van Thủ Công (Mode: Manual)</h3></div>
+                <div class="manual-valve-grid" id="manualValveGrid">
+                    <!-- JS sẽ tạo 12 nút bấm ở đây -->
+                </div>
             </div>
 
         </div>
@@ -410,6 +513,45 @@
             valveContainer.appendChild(div);
         }
 
+        // --- TẠO 12 NÚT BẤM THỦ CÔNG ---
+        const manualGrid = document.getElementById("manualValveGrid");
+        for(let i=1; i<=12; i++){
+            let wrapper = document.createElement("div");
+            wrapper.className = "valve-wrapper";
+            
+            // Label
+            let label = document.createElement("span");
+            label.className = "valve-label";
+            label.innerText = "VAN " + i;
+            
+            // Group: LED + Switch
+            let group = document.createElement("div");
+            group.className = "valve-status-group";
+            
+            // LED
+            let led = document.createElement("div");
+            led.className = "led";
+            led.id = "ledV" + i;
+            
+            // Switch
+            let lblSwitch = document.createElement("label");
+            lblSwitch.className = "switch-sm";
+            lblSwitch.innerHTML = `<input type="checkbox" id="swV${i}" onclick="toggleValveManual(${i})"><span class="slider-sm"></span>`;
+            
+            group.appendChild(led);
+            group.appendChild(lblSwitch);
+            
+            wrapper.appendChild(label);
+            wrapper.appendChild(group);
+            manualGrid.appendChild(wrapper);
+        }
+
+        function toggleValveManual(id) {
+            let chk = document.getElementById("swV" + id);
+            let cmd = chk.checked ? "1" : "0";
+            sendMqtt("farm/valve_control", id + "_" + cmd);
+        }
+
         // --- MQTT LOGIC ---
         client.onConnectionLost = function(responseObject) {
             document.getElementById("connection-status").innerHTML = '<i class="fas fa-exclamation-triangle"></i> Mất kết nối';
@@ -440,6 +582,19 @@
                         }
                     }
 
+                    // Cập nhật trạng thái Nguồn (Icon Giám Sát)
+                    let iconPower = document.getElementById("iconPower");
+                    let lblPowerStatus = document.getElementById("lblPower");
+                    if(data.power == 1){
+                        lblPowerStatus.innerText = "ON";
+                        lblPowerStatus.style.color = "#f39c12";
+                        iconPower.className = "fas fa-bolt big-icon power-on";
+                    } else {
+                        lblPowerStatus.innerText = "OFF";
+                        lblPowerStatus.style.color = "#95a5a6";
+                        iconPower.className = "fas fa-bolt big-icon power-off";
+                    }
+
                     // Cập nhật trạng thái Bơm
                     let iconPump = document.getElementById("iconPump");
                     let lblPump = document.getElementById("lblPump");
@@ -453,6 +608,17 @@
                         iconPump.className = "fas fa-water big-icon pump-off";
                     }
                     
+                    // Cập nhật nút Power
+                    let btnPower = document.getElementById("btnPower");
+                    let txtPower = document.getElementById("txtPower");
+                    if(data.power == 1){
+                        txtPower.innerText = "TẮT NGUỒN";
+                        btnPower.style.filter = "brightness(1.2)"; // Sáng hơn khi bật
+                    } else {
+                        txtPower.innerText = "BẬT NGUỒN";
+                        btnPower.style.filter = "brightness(1)";
+                    }
+
                     // Cập nhật Van
                     document.getElementById("lblValve").innerText = (data.valve == 0) ? "Không" : "Số " + data.valve;
                     
@@ -481,6 +647,19 @@
                         }
                     }
 
+                    // Cập nhật trạng thái các nút van thủ công (Đèn hiển thị)
+                    if(data.vStatus && Array.isArray(data.vStatus)){
+                        for(let i=0; i<data.vStatus.length; i++){
+                            // Update LED
+                            let led = document.getElementById("ledV" + (i+1));
+                            if(data.vStatus[i] == 1) led.classList.add("on"); else led.classList.remove("on");
+                            
+                            // Update Switch State
+                            let sw = document.getElementById("swV" + (i+1));
+                            sw.checked = (data.vStatus[i] == 1);
+                        }
+                    }
+
                     // --- XỬ LÝ LỖI & LOG ---
                     let mainResetBtn = document.getElementById("mainResetBtn");
                     
@@ -502,8 +681,14 @@
 
                     // Disable nút bấm thủ công nếu đang Auto
                     let manualPanel = document.getElementById("manualPanel");
-                    if(data.mode == 1) manualPanel.classList.add("disabled");
-                    else manualPanel.classList.remove("disabled");
+                    let manualGridDiv = document.getElementById("manualValveGrid");
+                    if(data.mode == 1) {
+                        manualPanel.classList.add("disabled");
+                        manualGridDiv.classList.add("disabled"); // Khóa luôn các nút van lẻ
+                    } else {
+                        manualPanel.classList.remove("disabled");
+                        manualGridDiv.classList.remove("disabled");
+                    }
 
                 } catch(e) { console.error(e); }
             } else if (message.destinationName === "farm/error") {
@@ -538,6 +723,11 @@
         }
 
         // --- CÁC HÀM ĐIỀU KHIỂN ---
+        function togglePower(){
+            let txt = document.getElementById("txtPower").innerText;
+            let cmd = (txt === "BẬT NGUỒN") ? "on" : "off";
+            sendMqtt("farm/power", cmd);
+        }
         
         // --- CÁC HÀM ĐỒNG HỒ ---
         function startClientClock() {
@@ -634,10 +824,7 @@
             let val = isAuto ? "auto" : "manual";
             sendMqtt("farm/mode", val);
             
-            // Hiệu ứng UX ngay lập tức
-            let manualPanel = document.getElementById("manualPanel");
-            if(isAuto) manualPanel.classList.add("disabled");
-            else manualPanel.classList.remove("disabled");
+            // Giao diện sẽ được cập nhật khi nhận phản hồi từ MQTT status
         }
 
         // 1. Đồng bộ giờ
