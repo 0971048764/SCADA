@@ -437,6 +437,9 @@
                     <button id="mainResetBtn" class="btn-big btn-reset disabled" style="grid-column: span 1;" onclick="sendMqtt('farm/reset', '1')">
                         <i class="fas fa-redo"></i> RESET HỆ THỐNG
                     </button>
+                    <button class="btn-big" style="background: #1b03f0; grid-column: span 2; margin-top: 10px;" onclick="if(confirm('Bạn có chắc muốn khởi động lại thiết bị (Reboot)?')) sendMqtt('farm/reboot', '1')">
+                        <i class="fas fa-sync"></i> KHỞI ĐỘNG LẠI (REBOOT)
+                    </button>
                 </div>
             </div>
 
